@@ -89,14 +89,14 @@ def run_hello_llm():
 
 
     messages: List[dict] = [] # Stores conversation history
-    # --- CRITICAL: VERY AGGRESSIVE SYSTEM MESSAGE ---
+    # --- CRITICAL: System Message with strong enforcement and example ---
     messages.append({
         "role": "system",
         "content": (
             "You are an expert in State Transition Machines (STM) and XML structures. "
-            "Your **SINGLE AND ONLY TASK** when asked to 'generate XML' is to output a **WELL-FORMED STM XML WORKFLOW** that adheres **PERFECTLY and STRICTLY** to the schema provided below. "
-            "You **MUST NOT** include any conversational text, explanations, intros, outros, or any markdown outside the XML block. Your output **MUST BE ONLY** the XML content, wrapped in ```xml...```.\n\n"
-            "**STRICT SCHEMA AND EXAMPLE (COPY EXACTLY FOR STRUCTURE):**\n"
+            "Your **ABSOLUTE TOP PRIORITY** when asked to 'generate XML' is to output a **well-formed STM XML workflow** that adheres **STRICTLY** to the provided schema. "
+            "You **MUST** follow this exact format and schema precisely.\n\n"
+            "**REQUIRED XML SCHEMA AND EXAMPLE - OUTPUT ONLY THIS FORMAT:**\n"
             "```xml\n"
             "<workflow id='MyWorkflowId'>\n"
             "    <state id='StateOne' initial='true'>\n"
@@ -108,13 +108,14 @@ def run_hello_llm():
             "    <state id='StateThree'/>\n"
             "</workflow>\n"
             "```\n"
-            "**RULES (CRITICAL - DO NOT DEVIATE):**\n"
-            "- Root element: `<workflow>` with a unique `id` attribute.\n"
-            "- States: `<state>` with a unique `id` attribute. Mark initial state with `initial='true'`.\n"
+            "**RULES:**\n"
+            "- Root element: `<workflow>` with **unique** `id` attribute.\n"
+            "- States: `<state>` with **unique** `id` attribute. Mark initial state with `initial='true'`.\n"
             "- Transitions: `<transition>` inside source `<state>`, with `event` and `target` attributes.\n"
-            "- All `target` state `id`s MUST exist as `id`s of defined `<state>` elements.\n"
-            "- **FORBIDDEN ELEMENTS/ATTRIBUTES:** Do NOT generate `<name>`, `<description>`, `<title>`, `<process>`, `<event>`, `<flow>`, `<connect>`, `value`, `from`, `to`, `events`, `type`, `on`, `condition`, `stateRef`, `initialState`, `transitions`, `workflowStates`, `workflowActions`, `workflow_name`, or any attributes not explicitly defined (id, initial, event, target). Do NOT use namespaces or XML declarations (`<?xml ...?>`).\n"
-            "- If you absolutely cannot meet the strict format, output a simple `<error>Cannot generate in specified format</error>`."
+            "- All `target` state `id`s must exist as defined `<state>` `id`s.\n"
+            "- **CRITICAL**: AVOID generating extraneous XML elements like `<name>`, `<description>`, `<title>`, `<process>`, `<event>`, `<flow>`, `<connect>`, `value`, `from`, `to`, `events`, `type`, `on`, `condition`, `stateRef`, `initialState`, `transitions`, `workflowStates`, `workflowActions`, `workflow_name`, or any attributes not explicitly defined (id, initial, event, target). Do NOT use namespaces or XML declarations (`<?xml ...?>`).\n"
+            "- Your output MUST be ONLY the XML content, wrapped in ```xml...```. No other text."
+            "If you cannot generate the XML exactly as requested, clearly state that you cannot adhere to the specific XML structure and explain why."
         )
     })
 
@@ -147,7 +148,15 @@ def run_hello_llm():
                     print(xml_content[:500] + ('...' if len(xml_content) > 500 else ''))
                     print("--- End XML Content Preview ---")
 
-                    messages.append({"role": "user", "content": f"I have loaded the following STM XML content:\n```xml\n{xml_content}\n```\nWhat would you like to do with this XML? (e.g., 'validate it', 'explain it', 'suggest improvements')"})
+                    # --- CRITICAL FIX: Changed prompt after loading XML to be more direct ---
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            f"I have successfully loaded the following STM XML content:\n```xml\n{xml_content}\n```\n"
+                            f"The XML preview is above. What would you like to do with this workflow? You can ask me to 'validate it', 'explain it', or 'suggest improvements'."
+                        )
+                    })
+                    # --- END CRITICAL FIX ---
 
                     llm_response = _generate_llm_response(model, tokenizer, messages, device)
                     print(f"STM Assistant: {llm_response}") # Print the LLM's response to loaded XML
@@ -186,9 +195,18 @@ def run_hello_llm():
                 else:
                     validation_report += "\nNo Warnings Found.\n"
 
-                validation_report += "\nPlease analyze this report and provide further insights or suggestions."
-
-                messages.append({"role": "user", "content": validation_report})
+                # --- CRITICAL FIX: Make the LLM explicitly list errors/warnings ---
+                analysis_request_message = {
+                    "role": "user",
+                    "content": (
+                        f"The content I asked you to validate has been programmatically validated. "
+                        f"Here is the validation summary:\n{validation_summary}\n"
+                        f"Please analyze this summary, focusing on **listing each specific error and warning message exactly as provided**, "
+                        f"and then provide clear, actionable suggestions for improving the XML to conform to the specified STM schema."
+                    )
+                }
+                # --- END CRITICAL FIX ---
+                messages.append(analysis_request_message)
 
                 llm_response = _generate_llm_response(model, tokenizer, messages, device)
                 print(f"STM Assistant: {llm_response}") # Print the LLM's analysis of the validation report
@@ -254,17 +272,18 @@ def run_hello_llm():
                 else:
                     validation_summary += "\nNo Warnings Found.\n"
 
-                # --- Prepare message for LLM to analyze validation ---
+                # --- CRITICAL FIX: Make the LLM explicitly list errors/warnings ---
                 analysis_request_message = {
                     "role": "user",
                     "content": (
-                        f"The content I asked you to generate has been programmatically validated. " # Changed from XML
+                        f"The content I asked you to generate has been programmatically validated. "
                         f"Here is the validation summary:\n{validation_summary}\n"
-                        f"Please analyze this summary, point out any specific issues (errors/warnings), "
-                        f"and provide clear, actionable suggestions for improving the generated content to conform to the specified STM XML schema. " # Changed from XML
+                        f"Please analyze this summary, focusing on **listing each specific error and warning message exactly as provided**, "
+                        f"and then provide clear, actionable suggestions for improving the generated content to conform to the specified STM XML schema. "
                         f"Focus ONLY on the structural XML requirements from the system message. If no XML was found, advise on how to better prompt for it."
                     )
                 }
+                # --- END CRITICAL FIX ---
                 messages.append(analysis_request_message)
 
                 # --- Second LLM call: Get analysis of validation ---
