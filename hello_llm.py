@@ -44,7 +44,7 @@ def run_hello_llm():
     including loading content from local XML files, performing basic validation,
     and generating new XML structures from natural language.
     """
-    model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+    model_name = "mistralai/Devstral-Small-2505"
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Attempting to run LLM on: {device}")
