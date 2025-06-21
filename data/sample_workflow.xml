@@ -1,0 +1,10 @@
+<states>
+    <flow id="doorControlFlow" default="true">
+        <manual-state id="DoorClosed" initialState="true">
+            <on eventId="push" newStateId="DoorOpen" componentName="DoorSensor"/>
+        </manual-state>
+        <manual-state id="DoorOpen">
+            <on eventId="pull" newStateId="DoorClosed" componentName="DoorSensor"/>
+        </manual-state>
+    </flow>
+</states>
